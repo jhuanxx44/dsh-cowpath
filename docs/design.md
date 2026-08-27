@@ -1,6 +1,6 @@
 # 设计摘要 — cowpath（弯路驱动的技能沉淀器）
 
-> 权威设计源：me-wiki `wiki/projects/dsh-shortcut.md`。本文件是摘要与指针，**有歧义以 wiki 为准**。最后同步：2026-08-27。
+> 权威设计源：me-wiki `wiki/projects/cowpath.md`。本文件是摘要与指针，**有歧义以 wiki 为准**。最后同步：2026-08-27。
 
 ## 定位
 

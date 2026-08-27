@@ -4,7 +4,7 @@
 
 > 名字即机制：取自软件成语 *pave the cowpath*（把人实际走出来的路铺成正式路）。牛不规划路线，靠反复试走找出路——**留下来的那条就是走通了的那条**。cowpath 只收「失败→修正→成功」的弯路，执行轨迹作一等输入，lint 作确定性验证门，交付物是三臂对比报告。
 
-设计权威源：me-wiki 项目页 `wiki/projects/dsh-shortcut.md`（本仓库的 `docs/design.md` 是摘要与指针，不是替代）。
+设计权威源：me-wiki 项目页 `wiki/projects/cowpath.md`（本仓库的 `docs/design.md` 是摘要与指针，不是替代）。
 
 ## 当前状态
 
@@ -55,6 +55,6 @@ python3 tools/classify.py
 
 ## 相关
 
-- me-wiki 项目页：[[cowpath]]（`wiki/projects/dsh-shortcut.md`）
+- me-wiki 项目页：[[cowpath]]（`wiki/projects/cowpath.md`）
 - 模式来源：[[agent-self-evolution-patterns]]
 - 宿主：[[deepseek-harness]]
