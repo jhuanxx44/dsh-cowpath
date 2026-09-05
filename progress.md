@@ -79,3 +79,19 @@ cowpath（wiki/projects/cowpath.md）设计里「第一步」是手工跑 3–5 
 - [ ] A：写第一份 SKILL.md 草稿（DSH 工具协议纪律，B 臂人手写版本）
 - [ ] C：结论收敛后沉淀进 wiki（需用户确认；含对「频次=优先级」设计的修正）
 - [ ] 脚本归档为可复用工具（增量扫描能力）
+
+## 2026-09-05 本轮研究（实时复核）
+
+- 当前扫描 `~/.dsh/sessions/`：538 个会话、42,849 tool calls、747 errors、533 llm/retry（由 `data/all_sessions.txt` 与 `data/current_scan.json` 生成，均 gitignored）。
+- 实时最高频错误：sandbox escalation 159、edit 未先 read 130、invalid justification 114、file changed 未 re-read 64、old_string 不匹配 37。
+- 发现脚本口径问题：`trail_scan.py` 的 `turns` 在跨文件循环外，key 只有 `(turn, step)`，可能跨会话配对；环境关键词漏 `timed out`；`extract_errors.py`/`classify.py` 使用 `/tmp` 固定输入，与 README 不一致。
+- 首个真实 session 元数据含 `permission/preset`、`sandbox/mode`、`approval/policy`，支持上下文前置过滤设计。
+- 本轮未写插件代码；结论与证据已记录于 `findings.md`。
+- 临时修正版将 `turns` 每会话隔离后，同口径配对率从脚本的 72.8% 降为 3.2%（24/747），确认跨会话状态污染是实质性问题；此数仍只是同名工具配对，不是最终操作对象配对率。
+
+## 2026-09-05 MVP 实现
+
+- 新增 `tools/cowpath_mvp.py`，实现离线候选报告器：session 隔离、元数据读取、确定性过滤、对象提取、跨工具失败→成功配对、JSON/Markdown 输出。
+- 合成样本通过：`edit` 失败 → `read` → `edit` 成功可识别。
+- 当前 538 会话回放结果：756 errors、617 filtered、166 paired、153 candidate groups；结果仅作候选发现，不是质量结论。
+- README 增加 MVP 用法；未实现自动写 SKILL、后台监听、语义判定和行为验证门。

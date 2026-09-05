@@ -76,3 +76,14 @@ python3 tools/classify.py
 - me-wiki 项目页：[[cowpath]]（`wiki/projects/cowpath.md`）
 - 模式来源：[[agent-self-evolution-patterns]]
 - 宿主：[[deepseek-harness]]
+
+## MVP：弯路候选报告器
+
+`tools/cowpath_mvp.py` 是当前阶段的离线 MVP。它不调用 LLM、不写入 skill，只生成待人工审核的候选：
+
+```bash
+python3 tools/cowpath_mvp.py data/all_sessions.txt \
+  -o data/mvp.json --markdown data/mvp.md
+```
+
+输入清单每行一个 `session.jsonl.zstd` 绝对路径。MVP 会隔离每个 session 的状态，读取权限/sandbox/approval 元数据，过滤会话噪声、环境错误和自带修复指令，并按文件路径或其他操作对象寻找后续成功动作。输出包含错误签名、失败/修正工具、独立会话数和原始示例；不会自动生成或覆盖 `SKILL.md`。
