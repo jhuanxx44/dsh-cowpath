@@ -95,3 +95,10 @@ cowpath（wiki/projects/cowpath.md）设计里「第一步」是手工跑 3–5 
 - 合成样本通过：`edit` 失败 → `read` → `edit` 成功可识别。
 - 当前 538 会话回放结果：756 errors、617 filtered、166 paired、153 candidate groups；结果仅作候选发现，不是质量结论。
 - README 增加 MVP 用法；未实现自动写 SKILL、后台监听、语义判定和行为验证门。
+
+## 2026-09-06 可安装离线审阅器
+
+- `tools/cowpath_mvp.py` 新增 `--workspace` 模式：自动发现工作区历史 session，扫描现有 `.agents/skills/*/SKILL.md`，确定性计算融合建议。
+- 交互选项：`n` 新建、`f` 融合、`s` 跳过、`q` 退出；只有明确选择 n/f 才写入，融合前生成 `.cowpath.bak`。
+- 新增 `install.sh`，安装本地 `cowpath` 命令；新增可被 skills 工具安装的 `skill/cowpath/SKILL.md`。
+- `--proposals-only` 提供完全只读模式。

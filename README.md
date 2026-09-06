@@ -87,3 +87,14 @@ python3 tools/cowpath_mvp.py data/all_sessions.txt \
 ```
 
 输入清单每行一个 `session.jsonl.zstd` 绝对路径。MVP 会隔离每个 session 的状态，读取权限/sandbox/approval 元数据，过滤会话噪声、环境错误和自带修复指令，并按文件路径或其他操作对象寻找后续成功动作。输出包含错误签名、失败/修正工具、独立会话数和原始示例；不会自动生成或覆盖 `SKILL.md`。
+
+## 可安装的离线工作区审阅器
+
+安装为本地命令：
+
+```bash
+./install.sh
+cowpath --workspace /absolute/path/to/workspace
+```
+
+Cowpath 会自动定位该工作区的历史 DSH 会话，生成候选并逐项询问：`n` 新建 Skill、`f` 融合到建议的现有 Skill、`s` 忽略、`q` 退出。写入前必须选择 `n` 或 `f`；融合前会创建 `.cowpath.bak` 备份。只查看候选可使用 `--proposals-only`。

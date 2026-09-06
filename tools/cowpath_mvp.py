@@ -146,16 +146,121 @@ def markdown(report):
 
 
 def main():
-    ap=argparse.ArgumentParser()
-    ap.add_argument("list_file", type=Path)
+    ap=argparse.ArgumentParser(description="Offline cowpath historical-session Skill reviewer")
+    ap.add_argument("list_file", nargs="?", type=Path, help="session list for scan mode")
     ap.add_argument("-o", "--output", type=Path)
     ap.add_argument("--markdown", type=Path)
+    ap.add_argument("--workspace", type=Path, help="review a workspace and discover its historical sessions")
+    ap.add_argument("--sessions-root", type=Path)
+    ap.add_argument("--limit", type=int, default=20)
+    ap.add_argument("--proposals-only", action="store_true", help="print proposals without writing")
     a=ap.parse_args()
-    paths=[x.strip() for x in a.list_file.read_text().splitlines() if x.strip() and not x.lstrip().startswith("#")]
-    report=scan(paths)
+    if a.workspace:
+        report=review_workspace(a.workspace, a.sessions_root, a.limit, a.proposals_only)
+    else:
+        if not a.list_file: ap.error("provide list_file or --workspace")
+        paths=[x.strip() for x in a.list_file.read_text().splitlines() if x.strip() and not x.lstrip().startswith("#")]
+        report=scan(paths)
     payload=json.dumps(report, ensure_ascii=False, indent=2)
     if a.output: a.output.write_text(payload+"\n")
     else: print(payload)
     if a.markdown: a.markdown.write_text(markdown(report)+"\n")
+
+
+# --- workspace review / installable offline flow ---
+def discover_sessions(workspace, sessions_root=None):
+    """Find DSH sessions for an encoded workspace directory."""
+    workspace = str(Path(workspace).resolve())
+    root = Path(sessions_root or Path.home()/".dsh"/"sessions")
+    encoded = "--" + workspace.strip("/").replace("/", "-") + "--"
+    candidates = [root/encoded]
+    # Also accept direct project directory names supplied by callers.
+    candidates.append(root/workspace.replace("/", "-"))
+    for base in candidates:
+        if base.exists():
+            return sorted(base.glob("session-*/session.jsonl.zstd"))
+    return []
+
+
+def existing_skills(workspace):
+    root = Path(workspace) / ".agents" / "skills"
+    return sorted(p for p in root.glob("*/SKILL.md") if p.is_file())
+
+
+def skill_terms(path):
+    text = path.read_text(errors="replace")[:12000].lower()
+    words = set(re.findall(r"[a-z][a-z0-9_-]{2,}|[\u4e00-\u9fff]{2,}", text))
+    return words
+
+
+def suggest_skill(candidate, skills):
+    """Deterministic overlap suggestion; model-free and explainable."""
+    hay = (candidate["object"] + " " + candidate["failure_signature"]).lower()
+    tokens = set(re.findall(r"[a-z][a-z0-9_-]{2,}|[\u4e00-\u9fff]{2,}", hay))
+    best, score, overlap = None, 0, set()
+    for path in skills:
+        hit = tokens & skill_terms(path)
+        if len(hit) > score:
+            best, score, overlap = path, len(hit), hit
+    return {"action": "fuse" if score else "new", "skill": str(best) if best else None,
+            "overlap": sorted(overlap)}
+
+
+def skill_draft(candidate):
+    obj = candidate["object"]
+    sig = candidate["failure_signature"]
+    repairs = ", ".join(f"{k} ({v})" for k,v in candidate["repair_tools"].items())
+    return f"""---\nname: cowpath-{hashlib.sha1((obj+sig).encode()).hexdigest()[:10]}\ndescription: Prevent and recover from `{sig}` on `{obj}` based on historical workspace sessions.\nmetadata:\n  source: cowpath-offline\n  evidence_sessions: {candidate['session_count']}\n---\n\n# Recovered path\n\n## Trigger\n\nA `{sig}` failure occurs while operating on `{obj}`.\n\n## Recovery\n\nUse the successful historical recovery actions: {repairs}. Re-read the current target before retrying when the target may have changed.\n\n## Evidence\n\n- Independent sessions: {candidate['session_count']}\n- Failure tools: {candidate['failure_tools']}\n- Repair tools: {candidate['repair_tools']}\n- Source session IDs: {', '.join(candidate['sessions'])}\n\nThis skill was proposed by cowpath and requires human review before use.\n"""
+
+
+def apply_decision(candidate, suggestion, workspace, choice):
+    root = Path(workspace) / ".agents" / "skills"
+    root.mkdir(parents=True, exist_ok=True)
+    draft = skill_draft(candidate)
+    if choice == "n":
+        name = "cowpath-" + hashlib.sha1((candidate["object"] + candidate["failure_signature"]).encode()).hexdigest()[:10]
+        target = root / name / "SKILL.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(draft)
+        return f"created {target}"
+    if choice == "f" and suggestion.get("skill"):
+        target = Path(suggestion["skill"])
+        original = target.read_text(errors="replace")
+        backup = target.with_suffix(target.suffix + ".cowpath.bak")
+        backup.write_text(original)
+        section = "\n\n## Cowpath recovered path\n\n" + draft.split("---\n", 2)[-1]
+        target.write_text(original.rstrip() + section)
+        return f"fused into {target} (backup: {backup})"
+    return "ignored"
+
+
+def review_workspace(workspace, sessions_root=None, limit=20, non_interactive=False):
+    paths = discover_sessions(workspace, sessions_root)
+    report = scan([str(p) for p in paths])
+    skills = existing_skills(workspace)
+    report["workspace"] = str(Path(workspace).resolve())
+    report["session_paths"] = [str(p) for p in paths]
+    report["proposals"] = []
+    for candidate in report["candidates"][:limit]:
+        suggestion = suggest_skill(candidate, skills)
+        proposal = dict(candidate, suggestion=suggestion, decision="pending")
+        if non_interactive:
+            report["proposals"].append(proposal)
+            continue
+        print("\n--- Cowpath proposal ---")
+        print(f"Object: {candidate['object']}\nFailure: {candidate['failure_signature']}")
+        print(f"Evidence: {candidate['session_count']} sessions; repairs: {candidate['repair_tools']}")
+        if suggestion["action"] == "fuse": print(f"Suggested: fuse into {suggestion['skill']} (overlap: {suggestion['overlap']})")
+        else: print("Suggested: create a new skill")
+        while True:
+            choice = input("[n]ew  [f]use  [s]kip  [q]uit: ").strip().lower() or "s"
+            if choice in "nfsq": break
+        if choice == "q": break
+        proposal["decision"] = {"n":"new", "f":"fuse", "s":"skip"}[choice]
+        if choice in ("n", "f"):
+            print(apply_decision(candidate, suggestion, workspace, choice))
+        report["proposals"].append(proposal)
+    return report
+
 
 if __name__ == "__main__": main()
