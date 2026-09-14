@@ -9,6 +9,9 @@ __pycache__/
 # macOS
 .DS_Store
 
+# Local agent instructions
+AGENTS.md
+
 # 环境
 node_modules/
 .env
