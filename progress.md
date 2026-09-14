@@ -115,3 +115,9 @@ cowpath（wiki/projects/cowpath.md）设计里「第一步」是手工跑 3–5 
 - `tools/classify.py`：支持位置参数输入，默认读取 `data/all_errors.json`，移除固定 `/tmp/all_errors.json` 依赖。
 - `README.md`：同步三个脚本的默认用法和显式路径用法。
 - 验证：合成两个相同 `(turn, step)` 的 session，错误不会跨 session 配对；带空格的 session 路径可正常读取；`request timed out` 计入 `env_like` 和“环境类”。当前 538 个 session 重跑得到 755 errors、pair rate 0.032、env_like 6、539 `llm/retry`；`extract_errors.py` 两次输出逐字节一致。
+
+## 2026-09-14 操作对象重算
+
+- 采用两层边界：工作区目录负责观察范围、session 隔离和跨会话聚合；文件路径/URL/目标负责同一工作区内的失败→成功因果配对。
+- `tools/cowpath_mvp.py` 候选键改为 `(workspace, target, failure_signature)`，候选报告新增稳定的 `workspace` 字段，Markdown 同步展示工作区。
+- 当前 `data/all_sessions.txt` 重算结果：17 个工作区、764 errors、623 filtered、167 paired、155 candidate groups。候选排序和人工抽检仍是下一步，不能把 paired 当作技能收益。

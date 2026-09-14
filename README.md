@@ -90,7 +90,7 @@ python3 tools/cowpath_mvp.py data/all_sessions.txt \
   -o data/mvp.json --markdown data/mvp.md
 ```
 
-输入清单每行一个 `session.jsonl.zstd` 绝对路径。MVP 会隔离每个 session 的状态，读取权限/sandbox/approval 元数据，过滤会话噪声、环境错误和自带修复指令，并按文件路径或其他操作对象寻找后续成功动作。输出包含错误签名、失败/修正工具、独立会话数和原始示例；不会自动生成或覆盖 `SKILL.md`。
+输入清单每行一个 `session.jsonl.zstd` 绝对路径。MVP 会隔离每个 session 的状态，读取权限/sandbox/approval 元数据，过滤会话噪声、环境错误和自带修复指令；工作区目录是观察和跨会话聚合边界，文件路径或其他目标是工作区内寻找后续成功动作的因果键。输出包含工作区、错误签名、失败/修正工具、独立会话数和原始示例；不会自动生成或覆盖 `SKILL.md`。
 
 ## 可安装的离线工作区审阅器
 
