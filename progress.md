@@ -102,3 +102,16 @@ cowpath（wiki/projects/cowpath.md）设计里「第一步」是手工跑 3–5 
 - 交互选项：`n` 新建、`f` 融合、`s` 跳过、`q` 退出；只有明确选择 n/f 才写入，融合前生成 `.cowpath.bak`。
 - 新增 `install.sh`，安装本地 `cowpath` 命令；新增可被 skills 工具安装的 `skill/cowpath/SKILL.md`。
 - `--proposals-only` 提供完全只读模式。
+
+## 2026-09-14 后续路线
+
+- 已将后续门槛写入 `task_plan.md`：先修正并冻结离线测量口径，再按操作对象复算候选池，随后完成 3–5 轮手工闭环和 A/B/C 小规模实验；只有前提验证通过后才进入实时插件设计。
+- 当前不把 `skill/cowpath/SKILL.md` 或 `install.sh` 视为 DSH 运行时插件骨架；它们属于离线审阅器的安装入口。
+
+## 2026-09-14 已知问题修复
+
+- `tools/trail_scan.py`：将 `turns` 状态移入单个 session 的处理范围，修复跨 session 配对污染；环境关键词补齐 `timed out`，并改用 `subprocess.run([...])` 解压，避免 shell 路径拼接。
+- `tools/extract_errors.py`：改为可复用 CLI，支持位置参数清单和 `-o/--output`，默认 `data/ppt_all.txt` → `data/all_errors.json`；解压改为参数数组调用，session 内配对状态隔离。
+- `tools/classify.py`：支持位置参数输入，默认读取 `data/all_errors.json`，移除固定 `/tmp/all_errors.json` 依赖。
+- `README.md`：同步三个脚本的默认用法和显式路径用法。
+- 验证：合成两个相同 `(turn, step)` 的 session，错误不会跨 session 配对；带空格的 session 路径可正常读取；`request timed out` 计入 `env_like` 和“环境类”。当前 538 个 session 重跑得到 755 errors、pair rate 0.032、env_like 6、539 `llm/retry`；`extract_errors.py` 两次输出逐字节一致。

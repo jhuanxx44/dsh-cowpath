@@ -55,11 +55,15 @@ ls -d ~/.dsh/sessions/--Users-jinghuan-code-pptgenaiserver--/*/ \
 # 扫描一批会话，输出弯路统计 + 报错模板聚类（JSON）
 python3 tools/trail_scan.py data/ppt_all.txt
 
-# 提取全部报错 + 配对信息
-python3 tools/extract_errors.py   # 读 data/ppt_all.txt，写 data/all_errors.json
+# 提取全部报错 + 配对信息（默认读 data/ppt_all.txt，写 data/all_errors.json）
+python3 tools/extract_errors.py
+# 也可以显式指定输入清单和输出路径
+python3 tools/extract_errors.py data/all_sessions.txt -o data/all_errors.json
 
-# 按自解释性分类（读 data/all_errors.json）
+# 按自解释性分类（默认读 data/all_errors.json）
 python3 tools/classify.py
+# 或指定另一个提取结果
+python3 tools/classify.py data/current_errors.json
 ```
 
 ## 关键数据（截至 2026-08-27）
