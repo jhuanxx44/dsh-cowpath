@@ -51,6 +51,17 @@ def args_text(data):
     return ""
 
 
+def workspace_id(session_path):
+    """Return the stable encoded workspace directory for one DSH session."""
+    path = Path(session_path)
+    # DSH stores sessions as <encoded-workspace>/session-*/session.jsonl.zstd.
+    # Keep the encoded directory as the identifier: decoding '-' is ambiguous
+    # for workspace names that themselves contain hyphens.
+    if path.parent.parent.name:
+        return path.parent.parent.name
+    return "<unknown-workspace>"
+
+
 def objects(name, data, result=""):
     """Extract stable path/object keys from call arguments and result text."""
     blob = " ".join((name, args_text(data), result))
@@ -96,8 +107,11 @@ def read_session(path):
 def scan(paths):
     candidates = defaultdict(lambda: {"sessions": set(), "failures": Counter(), "repairs": Counter(), "examples": []})
     summary = Counter(sessions=0, calls=0, errors=0, filtered=0, candidates=0, paired=0)
+    workspaces = set()
     for path in paths:
         if not path: continue
+        workspace = workspace_id(path)
+        workspaces.add(workspace)
         meta, events = read_session(path)
         summary["sessions"] += 1
         summary["calls"] += sum(e["kind"] == "call" for e in events)
@@ -122,7 +136,7 @@ def scan(paths):
                 # first successful same-object action as a cross-tool repair.
                 success = next((x for x in matches if x["name"] == rec["name"]), matches[0])
                 summary["paired"] += 1
-                key = (obj, norm_error(err))
+                key = (workspace, obj, norm_error(err))
                 c = candidates[key]
                 c["sessions"].add(Path(path).parent.name)
                 c["failures"][rec["name"]] += 1
@@ -130,18 +144,19 @@ def scan(paths):
                 if len(c["examples"]) < 3:
                     c["examples"].append({"session":Path(path).parent.name, "failure_tool":rec["name"], "repair_tool":success["name"], "error":err[:500]})
     out=[]
-    for (obj, sig), c in sorted(candidates.items(), key=lambda kv:(-len(kv[1]["sessions"]), -sum(kv[1]["failures"].values()), kv[0])):
-        out.append({"object":obj, "failure_signature":sig, "session_count":len(c["sessions"]),
+    for (workspace, obj, sig), c in sorted(candidates.items(), key=lambda kv:(-len(kv[1]["sessions"]), -sum(kv[1]["failures"].values()), kv[0])):
+        out.append({"workspace":workspace, "object":obj, "failure_signature":sig, "session_count":len(c["sessions"]),
                     "sessions":sorted(c["sessions"]), "failure_tools":dict(c["failures"]),
                     "repair_tools":dict(c["repairs"]), "examples":c["examples"]})
     summary["candidates"] = len(out)
+    summary["workspaces"] = len(workspaces)
     return {"schema":"cowpath-mvp/v1", "summary":dict(summary), "candidates":out}
 
 
 def markdown(report):
-    s=report["summary"]; lines=["# Cowpath MVP 候选报告", "", f"会话 {s['sessions']}；tool 调用 {s['calls']}；错误 {s['errors']}；过滤 {s['filtered']}；配对 {s['paired']}；候选 {s['candidates']}。", ""]
+    s=report["summary"]; lines=["# Cowpath MVP 候选报告", "", f"工作区 {s.get('workspaces', 0)}；会话 {s['sessions']}；tool 调用 {s['calls']}；错误 {s['errors']}；过滤 {s['filtered']}；配对 {s['paired']}；候选 {s['candidates']}。", ""]
     for i,c in enumerate(report["candidates"],1):
-        lines += [f"## {i}. `{c['object']}`", "", f"- 失败：`{c['failure_signature']}`", f"- 独立会话：{c['session_count']}", f"- 失败工具：{c['failure_tools']}", f"- 修正工具：{c['repair_tools']}", ""]
+        lines += [f"## {i}. `{c['object']}`", "", f"- 工作区：`{c['workspace']}`", f"- 失败：`{c['failure_signature']}`", f"- 独立会话：{c['session_count']}", f"- 失败工具：{c['failure_tools']}", f"- 修正工具：{c['repair_tools']}", ""]
     return "\n".join(lines)
 
 
