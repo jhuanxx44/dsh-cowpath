@@ -5,7 +5,10 @@
 list_file: 每行一个 session.jsonl.zstd 的绝对路径
 输出: 单个 JSON 对象到 stdout
 """
-import json, os, re, sys
+import argparse
+import json
+import re
+import subprocess
 from collections import Counter, defaultdict
 
 def text_of(c):
@@ -26,16 +29,34 @@ def template(s, maxlen=160):
     s = re.sub(r'\s+', ' ', s).strip()
     return s[:120]
 
+
+def read_session(path):
+    """Read one zstd-compressed JSONL session without invoking a shell."""
+    result = subprocess.run(
+        ['zstd', '-d', '-c', path],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f'zstd failed for {path}: {result.stderr.strip()}')
+    return result.stdout
+
 def main():
-    list_file = sys.argv[1]
-    paths = [l.strip() for l in open(list_file) if l.strip()]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('list_file', help='文本文件，每行一个 session.jsonl.zstd 路径')
+    args = parser.parse_args()
+    with open(args.list_file, encoding='utf-8') as fh:
+        paths = [l.strip() for l in fh if l.strip()]
     stats = dict(sessions=len(paths), tool_calls=0, errors=0, pair=0,
                  env_like=0, retry=0, error_tools=Counter(),
                  templates=Counter(), examples={}, retry_reasons=Counter())
-    turns = defaultdict(list)
     for f in paths:
-        raw = os.popen(f'zstd -d -c "{f}" 2>/dev/null').read()
-        turn = None
+        raw = read_session(f)
+        # Turn/step identifiers are only unique within one session.  Keep this
+        # map inside the file loop so a result from another session can never
+        # complete or pair an earlier call.
+        turns = defaultdict(list)
         for line in raw.splitlines():
             if not line.strip(): continue
             try: o=json.loads(line)
@@ -60,20 +81,24 @@ def main():
                 stats['retry']+=1
                 d=o.get('data',{})
                 stats['retry_reasons'][(d.get('failure',{}).get('message','?') or '?')[:60]]+=1
-    # 配对 + 聚类（按模板）
-    for key, seq in turns.items():
-        for i, rec in enumerate(seq):
-            if rec['ok'] is False:
-                stats['errors']+=1
-                stats['error_tools'][rec['name']]+=1
-                tp = template(rec['err'])
-                stats['templates'][tp]+=1
-                if tp not in stats['examples']:
-                    stats['examples'][tp] = (rec['name'], rec['err'][:240])
-                env = any(k in rec['err'] for k in ['429','rate_limit','timeout','overloaded','502','500','stream idle','upstream','no cluster','terminated','ETIMEDOUT','ECONN'])
-                if env: stats['env_like']+=1
-                if any(r['name']==rec['name'] and r['ok'] for r in seq[i+1:]):
-                    stats['pair']+=1
+        # 配对 + 聚类（按模板），仍在当前 session 的边界内进行。
+        for key, seq in turns.items():
+            for i, rec in enumerate(seq):
+                if rec['ok'] is False:
+                    stats['errors']+=1
+                    stats['error_tools'][rec['name']]+=1
+                    tp = template(rec['err'])
+                    stats['templates'][tp]+=1
+                    if tp not in stats['examples']:
+                        stats['examples'][tp] = (rec['name'], rec['err'][:240])
+                    env = any(k in rec['err'].lower() for k in [
+                        '429', 'rate_limit', 'timeout', 'timed out', 'overloaded',
+                        '502', '500', 'stream idle', 'upstream', 'no cluster',
+                        'terminated', 'etimedout', 'econn',
+                    ])
+                    if env: stats['env_like']+=1
+                    if any(r['name']==rec['name'] and r['ok'] for r in seq[i+1:]):
+                        stats['pair']+=1
     out = dict(
         sessions=stats['sessions'], tool_calls=stats['tool_calls'],
         errors=stats['errors'], pair_rate=round(stats['pair']/max(stats['errors'],1),3),
