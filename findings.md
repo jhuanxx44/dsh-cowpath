@@ -53,3 +53,20 @@
 - 新增 `tools/cowpath_mvp.py`：零依赖、无 LLM、使用系统 `zstd`，输入路径清单，输出 `cowpath-mvp/v1` JSON 和可选 Markdown。
 - 对当前 538 个会话回放：756 errors，617 条被确定性过滤，166 次按操作对象配对，153 个候选分组。该结果用于发现候选，不代表技能价值或最终配对率；因为目前对象提取仍以路径和少量字段规则为主。
 - 合成 JSONL/zstd 样本验证了失败 edit → read → 成功 edit 的跨工具链能被识别，且 session 状态不会串联。
+
+## DSH 扩展点（2026-10-15，DSH 0.1.7-rc.2，只读调研）
+
+- 用户插件：放 `~/.dsh/profiles/<p>/node_modules`（可 `link:`），`dsh plugin --profile <p> add link:/abs/path`；包内 `dsh.bundle.patch` 自动插行（不要再手工插，重复 id 会崩）。
+- 改工具描述：`system-prompt/assemble` waterfall 可改 `assembly.tools`（直接发给模型，`dsh-agent-loop/lib/index.js:907,1048`）；改 description 安全，改 schema 有风险（执行端仍用原 schema 校验）。另可用 `ctx.systemPrompt.section` 加指导文本。
+- 调用前：`tools/pre-execute` 只能 allow/deny/cancel/ask，**不能改参数**；`ctx.tools.guard` 为同步最终 deny。
+- 调用后：`tools/post-execute` 可对失败结果替换 `content`、追加 `additionalContexts`、或 `block` 带纠正文本。参考实现 `dsh-repeat-tool-reminder`。
+- 观察：`ctx.on('session/event')`、`tools/result` 可实时旁听全部 agent。
+- 报错出处：old_string 未找到 `dsh-fs-local:703`；offset 越界 `dsh-tool-fs:53`；escalation/justification `dsh-sandbox:53`（参数说明 `sandboxPermissionsDescription()` `:86`）；edit 前未读 `dsh-fs-observation-policy:67`；读后文件变更 `dsh-fs-local:870-888`；subagent maxDepth `dsh-subagent:384`（可配置）。
+- `dsh-memory-evolve` 是 Hermes 式 memory+skill 插件，未安装、不碰工具错误，与本方向不重叠。
+
+## 错误头部（data/current_scan.json，538 sessions / 42,849 calls）
+
+- bash sandbox 参数类：escalation 不比当前更宽 159 + justification 为空 114 = 273（约 36%）
+- edit 协议类：edit 前未读 130 + 读后变更 64(+12 截断变体) + write 文件已不存在 8 ≈ 214（约 28%）
+- old_string 不匹配 37、read 不存在 18、grep 输出超限 13、offset 越界 11
+- 注意：这些在 cowpath 里被判为“自带修复指令”而过滤，但每条仍消耗一次往返；对 harness 改进而言它们恰恰是主要收益池。

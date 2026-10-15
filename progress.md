@@ -121,3 +121,9 @@ cowpath（wiki/projects/cowpath.md）设计里「第一步」是手工跑 3–5 
 - 采用两层边界：工作区目录负责观察范围、session 隔离和跨会话聚合；文件路径/URL/目标负责同一工作区内的失败→成功因果配对。
 - `tools/cowpath_mvp.py` 候选键改为 `(workspace, target, failure_signature)`，候选报告新增稳定的 `workspace` 字段，Markdown 同步展示工作区。
 - 当前 `data/all_sessions.txt` 重算结果：17 个工作区、764 errors、623 filtered、167 paired、155 candidate groups。候选排序和人工抽检仍是下一步，不能把 paired 当作技能收益。
+
+## 2026-10-15 方向调整
+
+- 用户确认新目标：**从真实轨迹出发的 harness 改进**（改工具描述/报错文案/前置检查），替代自动蒸馏 SKILL.md。
+- 依据：`data/mvp.json` 153 个候选中 147 个仅出现在 1 个 session，2 个 session 的 5 个，最多 5 个 session 的 1 个；头部均为工具协议错误（old_string 不匹配、offset 越界、escalation 参数误用、subagent maxDepth），非领域知识。
+- 下一步：调研 DSH 扩展点（工具描述能否覆盖、调用前后能否拦截、报错文案出处），决定改动落点与前后对比口径。
