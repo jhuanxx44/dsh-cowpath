@@ -41,7 +41,8 @@ dsh-cowpath/
 ├── tools/             # 分析脚本（Python 3，零依赖）
 │   ├── trail_scan.py  # 轨迹扫描器：会话 JSONL → 弯路统计 + 报错模板聚类
 │   ├── extract_errors.py # 提取全部 isError 报错（模板 + 配对信息）
-│   └── classify.py    # 报错自解释性五分类（噪声/自带指令/需推断/不明/环境）
+│   ├── classify.py    # 报错自解释性五分类（噪声/自带指令/需推断/不明/环境）
+│   └── recovery_cost.py # 报错家族按恢复成本排序（额外步数/token/死循环）
 └── data/              # 会话清单等过程数据（gitignored，含绝对路径）
 ```
 
@@ -59,6 +60,9 @@ python3 tools/trail_scan.py data/ppt_all.txt
 python3 tools/extract_errors.py
 # 也可以显式指定输入清单和输出路径
 python3 tools/extract_errors.py data/all_sessions.txt -o data/all_errors.json
+
+# 报错家族按恢复成本排序（带清单/脚本哈希 provenance）
+python3 tools/recovery_cost.py data/all_sessions.txt -o data/recovery_cost.json --markdown data/recovery_cost.md
 
 # 按自解释性分类（默认读 data/all_errors.json）
 python3 tools/classify.py

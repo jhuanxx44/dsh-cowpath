@@ -70,3 +70,10 @@
 - edit 协议类：edit 前未读 130 + 读后变更 64(+12 截断变体) + write 文件已不存在 8 ≈ 214（约 28%）
 - old_string 不匹配 37、read 不存在 18、grep 输出超限 13、offset 越界 11
 - 注意：这些在 cowpath 里被判为“自带修复指令”而过滤，但每条仍消耗一次往返；对 harness 改进而言它们恰恰是主要收益池。
+
+## 恢复成本排序（2026-10-15，`tools/recovery_cost.py`）
+
+- 第一批改动目标确定为两个，性质不同：
+  1. **fs 读-改协议**（edit-before-read + stale-since-read）：跨模型普遍，可恢复但贵，合计约 15M 额外 input tokens、824 额外步。
+  2. **gpt-5.6-sol 沙箱参数死循环**：单模型特有，在 `danger-full-access` 下反复传 `sandbox_permissions`/占位 justification，报错文案告诉它“不够宽”却没说“别传”，93% 未恢复。
+- 计算口径：恢复 = 同 turn 内同工具同目标的下一次成功调用（无则同工具任一成功）；额外 tokens 为 F.step+1..R.step 的 usage 之和，是上界。

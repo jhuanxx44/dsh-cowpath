@@ -127,3 +127,13 @@ cowpath（wiki/projects/cowpath.md）设计里「第一步」是手工跑 3–5 
 - 用户确认新目标：**从真实轨迹出发的 harness 改进**（改工具描述/报错文案/前置检查），替代自动蒸馏 SKILL.md。
 - 依据：`data/mvp.json` 153 个候选中 147 个仅出现在 1 个 session，2 个 session 的 5 个，最多 5 个 session 的 1 个；头部均为工具协议错误（old_string 不匹配、offset 越界、escalation 参数误用、subagent maxDepth），非领域知识。
 - 下一步：调研 DSH 扩展点（工具描述能否覆盖、调用前后能否拦截、报错文案出处），决定改动落点与前后对比口径。
+
+## 2026-10-15 恢复成本排序（harness 方向第 1 步）
+
+- 新增 `tools/recovery_cost.py`：按 callId 精确匹配 tool 结果，按确定性规则把报错归入家族，度量从失败到同 turn 内恢复的额外步数、额外调用和 token（上界），并统计死循环 turn（同 turn 同家族 ≥3 次）和触发模型。报告带 provenance（清单哈希、脚本哈希、git commit）。
+- 验证：同一清单两次输出逐字节一致；合成样本校验了恢复步数/token 计算和 session 隔离。
+- 结果（538 sessions / 44,260 calls / 764 errors，provenance 见 `data/recovery_cost.json`）：
+  - `fs/edit-before-read` 146 次、66 会话、全部恢复，额外 333 步、约 8.0M input tokens；8 个模型都有。
+  - `fs/stale-since-read` 110 次、46 会话，额外 491 步（4.59 步/次）、约 7.2M input tokens。
+  - `sandbox/escalation-not-wider` 159 + `justification-invalid` 114：几乎全是 `gpt-5.6-sol`（155/159、114/114），在 `danger-full-access` 下仍反复填 `sandbox_permissions` 和空/占位 justification，**93% 未恢复**，19 个死循环 turn，单 turn 最多 14 次。token 少是因为循环没出口，真实代价是 turn 卡死。
+  - 其余家族均 < 0.7M tokens。
